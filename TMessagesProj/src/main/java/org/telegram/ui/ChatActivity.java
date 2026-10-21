@@ -1343,8 +1343,8 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_NOQUOTE_FORWARD = 95;
     public final static int OPTION_REPEAT_AS_COPY = 96;
     public final static int OPTION_REVERSE = 97;
-    /** Nnngram: 消息菜单「过滤此类消息」. */
-    public final static int OPTION_FILTER_MESSAGE = 117;
+    /** Nnngram: 消息菜单「过滤此类消息」. 119 是 13.0.3 之后第一个空位 (117 已被 OPTION_SEND_MONEY 占用). */
+    public final static int OPTION_FILTER_MESSAGE = 119;
     public final static int OPTION_ABOUT_REVENUE_SHARING_ADS = 33;
     public final static int OPTION_REPORT_AD = 34;
     public final static int OPTION_REMOVE_ADS = 35;
