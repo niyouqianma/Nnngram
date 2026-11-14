@@ -78,6 +78,7 @@ import xyz.nextalone.gen.Config;
 import xyz.nextalone.nnngram.InlinesKt;
 import xyz.nextalone.nnngram.config.ConfigManager;
 import xyz.nextalone.nnngram.helpers.EntitiesHelper;
+import xyz.nextalone.nnngram.helpers.MessageFilterRules;
 import xyz.nextalone.nnngram.ui.PopupBuilder;
 import xyz.nextalone.nnngram.ui.StickerSizePreviewMessagesCell;
 import xyz.nextalone.nnngram.ui.sortList.ItemTouchHelperCallback;
@@ -233,6 +234,7 @@ public class ChatSettingActivity extends BaseActivity {
             if (view instanceof TextCheckCell) {
                 ((TextCheckCell) view).setChecked(Config.ignoreBlockedUser);
             }
+            MessageFilterRules.invalidate();
         } else if (position == hideGroupStickerRow) {
             Config.toggleHideGroupSticker();
             if (view instanceof TextCheckCell) {

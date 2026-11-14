@@ -91,6 +91,7 @@ import java.util.Map;
 
 import xyz.nextalone.gen.Config;
 import xyz.nextalone.nnngram.helpers.HyperOsHelper;
+import xyz.nextalone.nnngram.helpers.MessageFilterRules;
 import xyz.nextalone.nnngram.helpers.TranslateHelper;
 import xyz.nextalone.nnngram.utils.Log;
 
@@ -1745,6 +1746,7 @@ public abstract class TextSelectionHelper<Cell extends TextSelectionHelper.Selec
                     String currentFilteredMessages = Config.getMessageFilter();
                     currentFilteredMessages = currentFilteredMessages + (currentFilteredMessages.isEmpty() ? "" : "|") + str.toString();
                     Config.setMessageFilter(currentFilteredMessages);
+                    MessageFilterRules.invalidate();
                     hideActions();
                     clear(true);
                     return true;

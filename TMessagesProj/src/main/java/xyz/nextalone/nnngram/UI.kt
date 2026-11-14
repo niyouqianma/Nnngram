@@ -34,6 +34,7 @@ import org.telegram.ui.Components.EditTextBoldCursor
 import org.telegram.ui.Components.LayoutHelper
 import xyz.nextalone.gen.Config
 import xyz.nextalone.nnngram.activity.ChatSettingActivity
+import xyz.nextalone.nnngram.helpers.MessageFilterRules
 import java.util.regex.Pattern
 
 fun ChatSettingActivity.createMessageFilterSetter(context: Context, resourcesProvider: Theme.ResourcesProvider? = null) {
@@ -92,6 +93,7 @@ fun ChatSettingActivity.createMessageFilterSetter(context: Context, resourcesPro
                 if (!editText.text.isNullOrEmpty()) Pattern.compile(editText.text.toString().trim { it == '|' })
             }.onSuccess {
                 Config.messageFilter = editText.text.toString().trim { it == '|' }
+                MessageFilterRules.invalidate()
             }.onFailure {
                 Toast.makeText(context, LocaleController.getString("InvalidPattern", R.string.InvalidPattern), Toast.LENGTH_SHORT).show()
             }

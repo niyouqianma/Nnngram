@@ -146,6 +146,7 @@ import java.util.stream.Collectors;
 import me.vkryl.core.BitwiseUtils;
 
 import xyz.nextalone.gen.Config;
+import xyz.nextalone.nnngram.helpers.MessageFilterRules;
 import xyz.nextalone.nnngram.utils.MessageUtils;
 import xyz.nextalone.nnngram.utils.RecentChats;
 
@@ -7725,11 +7726,13 @@ public class MessagesController extends BaseController implements NotificationCe
                         if (index < 0) {
                             blockePeers.put(-chatId, 1);
                             getNotificationCenter().postNotificationName(NotificationCenter.blockedUsersDidLoad);
+                            MessageFilterRules.invalidateAccount(currentAccount);
                         }
                     } else {
                         if (index >= 0) {
                             blockePeers.removeAt(index);
                             getNotificationCenter().postNotificationName(NotificationCenter.blockedUsersDidLoad);
+                            MessageFilterRules.invalidateAccount(currentAccount);
                         }
                     }
                     exportedChats.put(chatId, res.full_chat.exported_invite);
@@ -7819,11 +7822,13 @@ public class MessagesController extends BaseController implements NotificationCe
                         if (index < 0) {
                             blockePeers.put(user.id, 1);
                             getNotificationCenter().postNotificationName(NotificationCenter.blockedUsersDidLoad);
+                            MessageFilterRules.invalidateAccount(currentAccount);
                         }
                     } else {
                         if (index >= 0) {
                             blockePeers.removeAt(index);
                             getNotificationCenter().postNotificationName(NotificationCenter.blockedUsersDidLoad);
+                            MessageFilterRules.invalidateAccount(currentAccount);
                         }
                     }
                     fullUsers.put(user.id, userFull);
@@ -8778,6 +8783,7 @@ public class MessagesController extends BaseController implements NotificationCe
             totalBlockedCount++;
         }
         getNotificationCenter().postNotificationName(NotificationCenter.blockedUsersDidLoad);
+        MessageFilterRules.invalidateAccount(currentAccount);
         TLRPC.TL_contacts_block req = new TLRPC.TL_contacts_block();
         if (user != null) {
             req.id = getInputPeer(user);
@@ -8967,6 +8973,7 @@ public class MessagesController extends BaseController implements NotificationCe
             req.id = getInputPeer(chat);
         }
         getNotificationCenter().postNotificationName(NotificationCenter.blockedUsersDidLoad);
+        MessageFilterRules.invalidateAccount(currentAccount);
         getConnectionsManager().sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
             if (callback != null) {
                 callback.run();

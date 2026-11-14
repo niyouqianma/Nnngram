@@ -18,9 +18,11 @@
  */
 package xyz.nextalone.nnngram.helpers
 
+import android.os.Looper
 import android.text.TextUtils
 import org.json.JSONArray
 import org.json.JSONObject
+import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.MessagesController
 import org.telegram.messenger.NotificationCenter
 import org.telegram.messenger.UserConfig
@@ -128,13 +130,50 @@ object MessageFilterRules {
     @JvmStatic
     fun invalidate() {
         cache = null
-        // 清所有账号的 dialog 预览 fallback 缓存, 否则 DialogCell 会继续显示旧规则下的替换消息.
-        for (a in 0 until UserConfig.MAX_ACCOUNT_COUNT) {
-            runCatching { MessagesController.getInstance(a).dialogMessageFromUnblocked.clear() }
+        val task = Runnable {
+            // 清所有账号的 dialog 预览 fallback 缓存并重算 dialogMessage 上的 filterAction,
+            // 否则从聊天返回列表时 DialogCell 仍会读取旧的 filterAction 继续渲染刚被屏蔽的消息.
+            for (a in 0 until UserConfig.MAX_ACCOUNT_COUNT) {
+                resetDialogFilterCache(a)
+            }
+            NotificationCenter.getGlobalInstance().postNotificationName(
+                NotificationCenter.messageFilterRulesChanged
+            )
         }
-        NotificationCenter.getGlobalInstance().postNotificationName(
-            NotificationCenter.messageFilterRulesChanged
-        )
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            task.run()
+        } else {
+            AndroidUtilities.runOnUIThread(task)
+        }
+    }
+
+    @JvmStatic
+    fun invalidateAccount(account: Int) {
+        val task = Runnable {
+            resetDialogFilterCache(account)
+            NotificationCenter.getGlobalInstance().postNotificationName(
+                NotificationCenter.messageFilterRulesChanged
+            )
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            task.run()
+        } else {
+            AndroidUtilities.runOnUIThread(task)
+        }
+    }
+
+    private fun resetDialogFilterCache(account: Int) {
+        runCatching {
+            val mc = MessagesController.getInstance(account)
+            mc.dialogMessageFromUnblocked.clear()
+            val dm = mc.dialogMessage
+            for (i in 0 until dm.size()) {
+                val list = dm.valueAt(i) ?: continue
+                for (j in 0 until list.size) {
+                    list[j]?.reapplyFilterAction()
+                }
+            }
+        }
     }
 
     /**

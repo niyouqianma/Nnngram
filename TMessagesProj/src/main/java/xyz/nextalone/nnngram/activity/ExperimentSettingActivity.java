@@ -47,6 +47,7 @@ import java.util.ArrayList;
 
 import xyz.nextalone.gen.Config;
 import xyz.nextalone.nnngram.config.ConfigManager;
+import xyz.nextalone.nnngram.helpers.MessageFilterRules;
 import xyz.nextalone.nnngram.ui.PopupBuilder;
 import xyz.nextalone.nnngram.utils.Defines;
 import xyz.nextalone.nnngram.utils.Log;
@@ -108,6 +109,7 @@ public class ExperimentSettingActivity extends BaseActivity {
             if (view instanceof TextCheckCell) {
                 ((TextCheckCell) view).setChecked(Config.blockSponsorAds);
             }
+            MessageFilterRules.invalidate();
         } else if (position == hideProxySponsorChannelRow) {
             Config.toggleHideProxySponsorChannel();
             if (view instanceof TextCheckCell) {
