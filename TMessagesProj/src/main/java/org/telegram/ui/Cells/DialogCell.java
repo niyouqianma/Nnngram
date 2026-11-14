@@ -2146,7 +2146,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 timeString = LocaleController.stringForMessageListDate(message.messageOwner.date);
             }
 
-            if (message == null || isSavedDialog) {
+            boolean hasUnreadBadge = unreadCount != 0 || markUnread || mentionCount != 0 || reactionMentionCount > 0 || pollVotesMentionCount > 0;
+            if ((message == null && !hasUnreadBadge) || isSavedDialog) {
                 drawCheck1 = false;
                 drawCheck2 = false;
                 drawClock = message != null && message.isSending() && currentDialogId == UserConfig.getInstance(currentAccount).getClientUserId();
@@ -2196,7 +2197,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     drawPollVotesMention = pollVotesMentionCount > 0;
                 }
 
-                if (message.isOut() && draftMessage == null && showChecks && !(message.messageOwner.action instanceof TLRPC.TL_messageActionHistoryClear)) {
+                if (message != null && message.isOut() && draftMessage == null && showChecks && !(message.messageOwner.action instanceof TLRPC.TL_messageActionHistoryClear)) {
                     if (message.isSending()) {
                         drawCheck1 = false;
                         drawCheck2 = false;
@@ -3270,6 +3271,17 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 if (dialogMessage != null) {
                     ArrayList<MessageObject> groupMessages = dialogMessage.get(dialog.id);
                     MessageObject object = groupMessages != null && !groupMessages.isEmpty() ? groupMessages.get(0) : null;
+                    if (MessageUtils.isDialogMessageBlocked(groupMessages, object)) {
+                        MessageObject cached = MessagesController.getInstance(currentAccount).dialogMessageFromUnblocked.get(dialog.id);
+                        if (cached != null && !cached.isBlockedMessage()) {
+                            object = cached;
+                        } else {
+                            object = MessageUtils.getInstance(currentAccount).getLastVisibleMessage(dialog.id);
+                            if (object != null) {
+                                MessagesController.getInstance(currentAccount).dialogMessageFromUnblocked.put(dialog.id, object);
+                            }
+                        }
+                    }
                     if (object != null && (maxMessage == null || object.messageOwner.date > maxMessage.messageOwner.date)) {
                         maxMessage = object;
                     }
@@ -3337,14 +3349,19 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                         groupMessages = MessagesController.getInstance(currentAccount).dialogMessage.get(dialog.id);
                         message = groupMessages != null && groupMessages.size() > 0 ? groupMessages.get(0) : null;
 
-                        if (message != null && message.isBlockedMessage()) {
+                        if (MessageUtils.isDialogMessageBlocked(groupMessages, message)) {
                             MessageObject cached = MessagesController.getInstance(currentAccount).dialogMessageFromUnblocked.get(dialog.id);
                             if (cached != null && !cached.isBlockedMessage()) {
                                 message = cached;
                             } else {
                                 message = MessageUtils.getInstance(currentAccount).getLastVisibleMessage(dialog.id);
-                                MessagesController.getInstance(currentAccount).dialogMessageFromUnblocked.put(dialog.id, message);
+                                if (message != null) {
+                                    MessagesController.getInstance(currentAccount).dialogMessageFromUnblocked.put(dialog.id, message);
+                                } else {
+                                    MessagesController.getInstance(currentAccount).dialogMessageFromUnblocked.remove(dialog.id);
+                                }
                             }
+                            groupMessages = null;
                         }
 
                         lastUnreadState = message != null && message.isUnread();

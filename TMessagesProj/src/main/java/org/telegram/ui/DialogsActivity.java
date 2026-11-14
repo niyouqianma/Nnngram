@@ -2870,6 +2870,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (!onlySelect) {
                 observersGroup.addGlobal(NotificationCenter.closeSearchByActiveAction);
                 observersGroup.addGlobal(NotificationCenter.proxySettingsChanged);
+                observersGroup.addGlobal(NotificationCenter.messageFilterRulesChanged);
                 observersGroup.add(NotificationCenter.filterSettingsUpdated);
                 observersGroup.add(NotificationCenter.dialogsUnreadCounterChanged);
             }
@@ -10675,6 +10676,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         } else if (id == NotificationCenter.appDidLogout) {
             dialogsLoaded[currentAccount] = false;
         } else if (id == NotificationCenter.encryptedChatUpdated) {
+            updateVisibleRows(0);
+        } else if (id == NotificationCenter.messageFilterRulesChanged) {
             updateVisibleRows(0);
         } else if (id == NotificationCenter.contactsDidLoad) {
             if (viewPages == null || dialogsListFrozen) {

@@ -146,6 +146,7 @@ import java.util.stream.Collectors;
 import me.vkryl.core.BitwiseUtils;
 
 import xyz.nextalone.gen.Config;
+import xyz.nextalone.nnngram.utils.MessageUtils;
 import xyz.nextalone.nnngram.utils.RecentChats;
 
 public class MessagesController extends BaseController implements NotificationCenter.NotificationCenterDelegate {
@@ -22244,11 +22245,16 @@ public class MessagesController extends BaseController implements NotificationCe
                     }
                 }
 
-                if (Config.ignoreBlockedUser && blockePeers.indexOfKey(lastMessage.getSenderId()) >= 0) {
+                if (MessageUtils.isDialogMessageBlocked(arrayList, lastMessage)) {
                     ArrayList<MessageObject> preMsg = dialogMessage.get(dialogId);
-                    if (preMsg.size() > 0 && blockePeers.indexOfKey(preMsg.get(0).getSenderId()) < 0) {
-                        dialogMessageFromUnblocked.put(dialogId, preMsg.get(0));
+                    if (preMsg != null && !preMsg.isEmpty() && !MessageUtils.isDialogMessageBlocked(preMsg, preMsg.get(0))) {
+                        MessageObject preview = MessageUtils.pickVisiblePreviewMessage(preMsg);
+                        if (preview != null) {
+                            dialogMessageFromUnblocked.put(dialogId, preview);
+                        }
                     }
+                } else {
+                    dialogMessageFromUnblocked.remove(dialogId);
                 }
 
                 dialogMessage.put(dialogId, arrayList);

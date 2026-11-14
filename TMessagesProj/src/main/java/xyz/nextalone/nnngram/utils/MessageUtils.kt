@@ -800,83 +800,138 @@ class MessageUtils(num: Int) : BaseController(num) {
     }
 
     /**
-     * 对 dialog 最近 10 条候选消息逐一构造 MessageObject 检查 isBlockedMessage (HIDE 命中即跳过).
+     * 对 dialog 最近 50 条候选消息逐一构造 MessageObject 检查 isBlockedMessage (HIDE 命中即跳过).
      * 取代旧 getLastMessageFromUnblockUser, 让新规则引擎 (regex/contains/sender_id/via_bot) 的 HIDE 动作
      * 也在 dialog list 预览里生效.
      */
     fun getLastVisibleMessage(dialogId: Long): MessageObject? {
-        val cursor: SQLiteCursor
+        var cursor: SQLiteCursor? = null
         var resp: MessageObject? = null
         try {
             cursor = messagesStorage.database.queryFinalized(
                 String.format(
                     Locale.US,
-                    "SELECT data,send_state,mid,date FROM messages WHERE uid = %d ORDER BY date DESC LIMIT %d,%d",
-                    dialogId, 0, 10
+                    "SELECT data,send_state,mid,date,read_state FROM messages_v2 WHERE uid = %d ORDER BY date DESC, mid DESC LIMIT %d,%d",
+                    dialogId, 0, 50
                 )
             )
+            var pendingGroupId = 0L
+            var pendingGroupCandidate: MessageObject? = null
+            var pendingGroupBlocked = false
             while (cursor.next()) {
                 val data = cursor.byteBufferValue(0) ?: continue
                 val message = TLRPC.Message.TLdeserialize(data, data.readInt32(false), false)
+                if (message != null) {
+                    message.readAttachPath(data, userConfig.clientUserId)
+                }
                 data.reuse()
-                val mo = MessageObject(currentAccount, message, true, true)
+                if (message == null) continue
+                MessageObject.setUnreadFlags(message, cursor.intValue(4))
                 message.send_state = cursor.intValue(1)
                 message.id = cursor.intValue(2)
                 message.date = cursor.intValue(3)
                 message.dialog_id = dialogId
-                if (!mo.isBlockedMessage) {
-                    resp = mo
-                    if (messagesController.getUser(resp.senderId) == null) {
-                        val user = messagesStorage.getUser(resp.senderId)
-                        if (user != null) messagesController.putUser(user, true)
+                val fromId = MessageObject.getFromChatId(message)
+                if (fromId > 0 && messagesController.getUser(fromId) == null) {
+                    val user = messagesStorage.getUser(fromId)
+                    if (user != null) messagesController.putUser(user, true)
+                } else if (fromId < 0 && messagesController.getChat(-fromId) == null) {
+                    val chat = messagesStorage.getChat(-fromId)
+                    if (chat != null) messagesController.putChat(chat, true)
+                }
+                val mo = MessageObject(currentAccount, message, true, true)
+                val groupId = message.grouped_id
+                if (pendingGroupId != 0L && groupId != pendingGroupId) {
+                    if (!pendingGroupBlocked && pendingGroupCandidate != null) {
+                        resp = pendingGroupCandidate
+                        break
                     }
-                    break
+                    pendingGroupId = 0L
+                    pendingGroupCandidate = null
+                    pendingGroupBlocked = false
+                }
+                if (groupId == 0L) {
+                    if (!mo.isBlockedMessage) {
+                        resp = mo
+                        break
+                    }
+                } else {
+                    if (pendingGroupId != groupId) {
+                        pendingGroupId = groupId
+                        pendingGroupCandidate = null
+                        pendingGroupBlocked = false
+                    }
+                    if (mo.isBlockedMessage) {
+                        pendingGroupBlocked = true
+                        pendingGroupCandidate = null
+                    } else if (!pendingGroupBlocked) {
+                        if (pendingGroupCandidate == null || !TextUtils.isEmpty(message.message)) {
+                            pendingGroupCandidate = mo
+                        }
+                    }
                 }
             }
-            cursor.dispose()
+            if (resp == null && pendingGroupId != 0L && !pendingGroupBlocked && pendingGroupCandidate != null) {
+                resp = pendingGroupCandidate
+            }
         } catch (sqLiteException: SQLiteException) {
             Log.e("SQLiteException when read last visible message", sqLiteException)
             return null
+        } finally {
+            cursor?.dispose()
         }
         return resp
     }
 
     fun getLastMessageFromUnblockUser(dialogId: Long): MessageObject? {
-        val cursor: SQLiteCursor
+        var cursor: SQLiteCursor? = null
         var resp: MessageObject? = null
         try {
             cursor = messagesStorage.database.queryFinalized(
                 String.format(
                     Locale.US,
-                    "SELECT data,send_state,mid,date FROM messages WHERE uid = %d ORDER BY date DESC LIMIT %d,%d",
+                    "SELECT data,send_state,mid,date,read_state FROM messages_v2 WHERE uid = %d ORDER BY date DESC, mid DESC LIMIT %d,%d",
                     dialogId,
                     0,
-                    10
+                    50
                 )
             )
             while (cursor.next()) {
                 val data = cursor.byteBufferValue(0) ?: continue
                 val message = TLRPC.Message.TLdeserialize(data, data.readInt32(false), false)
+                if (message != null) {
+                    message.readAttachPath(data, userConfig.clientUserId)
+                }
                 data.reuse()
-                if (messagesController.blockePeers.indexOfKey(message.from_id.user_id) < 0) {
-                    resp = MessageObject(currentAccount, message, true, true)
+                if (message == null) continue
+                val senderUid = message.from_id?.user_id ?: 0L
+                if (senderUid == 0L || messagesController.blockePeers.indexOfKey(senderUid) < 0) {
+                    MessageObject.setUnreadFlags(message, cursor.intValue(4))
                     message.send_state = cursor.intValue(1)
                     message.id = cursor.intValue(2)
                     message.date = cursor.intValue(3)
                     message.dialog_id = dialogId
-                    if (messagesController.getUser(resp.getSenderId()) == null) {
-                        val user = messagesStorage.getUser(resp.getSenderId())
+                    val fromId = MessageObject.getFromChatId(message)
+                    if (fromId > 0 && messagesController.getUser(fromId) == null) {
+                        val user = messagesStorage.getUser(fromId)
                         if (user != null) {
                             messagesController.putUser(user, true)
                         }
+                    } else if (fromId < 0 && messagesController.getChat(-fromId) == null) {
+                        val chat = messagesStorage.getChat(-fromId)
+                        if (chat != null) {
+                            messagesController.putChat(chat, true)
+                        }
                     }
+                    resp = MessageObject(currentAccount, message, true, true)
                     break
                 }
             }
-            cursor.dispose()
         } catch (sqLiteException: SQLiteException) {
             Log.e("SQLiteException when read last message from unblocked user", sqLiteException)
             return null
+        } finally {
+            cursor?.dispose()
         }
         return resp
     }
@@ -906,6 +961,29 @@ class MessageUtils(num: Int) : BaseController(num) {
                 }
             }
             return localInstance
+        }
+
+        @JvmStatic
+        fun isDialogMessageBlocked(groupMessages: List<MessageObject>?, fallback: MessageObject?): Boolean {
+            if (!groupMessages.isNullOrEmpty()) {
+                for (i in groupMessages.indices) {
+                    if (groupMessages[i].isBlockedMessage) return true
+                }
+                return false
+            }
+            return fallback != null && fallback.isBlockedMessage
+        }
+
+        @JvmStatic
+        fun pickVisiblePreviewMessage(groupMessages: List<MessageObject>?): MessageObject? {
+            if (groupMessages.isNullOrEmpty()) return null
+            for (i in groupMessages.indices) {
+                val msg = groupMessages[i]
+                if (msg.messageOwner != null && !TextUtils.isEmpty(msg.messageOwner.message)) {
+                    return msg
+                }
+            }
+            return groupMessages[0]
         }
 
         fun showDeleteHistoryBulletin(fragment: BaseFragment, count: Int, search: Boolean, resourcesProvider: Theme.ResourcesProvider? = null, delayedAction: Runnable?) {
